@@ -20,35 +20,67 @@ main =
 
 
 type alias Model =
+  { gridSize : GridSize
+  , tickIndex : Int
+  , grid : Grid
+  }
+
+type alias GridSize =
   { activeRadius : Int
-  , tickIndex: Int
   }
   
-activeWidth : Model -> Int
-activeWidth model = model.activeRadius * 2 - 1
+type Square = UnusedSquare | EmptySquare
+type alias Row = List Square
+type alias Grid = List Row
+  
+activeWidth : GridSize -> Int
+activeWidth gridSize = gridSize.activeRadius * 2 - 1
 
-maxWidth : Model -> Int
-maxWidth model = 5
+maxWidth : GridSize -> Int
+maxWidth gridSize = 5
 
-gridIndices : Model -> List Int
-gridIndices model = List.range 0 ((maxWidth model) - 1)
+gridIndices : GridSize -> List Int
+gridIndices gridSize = List.range 0 ((maxWidth gridSize) - 1)
 
-isActive : Model -> Int -> Int -> Bool
-isActive model rowIndex columnIndex =
-  isActiveIndex model rowIndex && isActiveIndex model columnIndex
+isActive : GridSize -> Int -> Int -> Bool
+isActive gridSize rowIndex columnIndex =
+  isActiveIndex gridSize rowIndex && isActiveIndex gridSize columnIndex
 
-isActiveIndex : Model -> Int -> Bool
-isActiveIndex model index =
+isActiveIndex : GridSize -> Int -> Bool
+isActiveIndex gridSize index =
   let
-    left = ((maxWidth model) - (activeWidth model)) // 2
-    right = left + (activeWidth model) - 1
+    left = ((maxWidth gridSize) - (activeWidth gridSize)) // 2
+    right = left + (activeWidth gridSize) - 1
   in
     index >= left && index <= right
 
 init : (Model, Cmd Msg)
 init =
-  ({ activeRadius = 2, tickIndex = 0 }, Cmd.none)
+  let
+    gridSize = { activeRadius = 2 }
+  in
+    ( { gridSize = gridSize
+      , tickIndex = 0
+      , grid = initialGrid gridSize
+      }
+    , Cmd.none
+    )
 
+
+initialGrid : GridSize -> Grid
+initialGrid gridSize =
+  List.map (initialRow gridSize) (gridIndices gridSize)
+
+initialRow : GridSize -> Int -> Row
+initialRow gridSize rowIndex =
+  List.map (initialSquare gridSize rowIndex) (gridIndices gridSize)
+
+initialSquare : GridSize -> Int -> Int -> Square
+initialSquare gridSize rowIndex columnIndex =
+  if isActive gridSize rowIndex columnIndex then
+    EmptySquare
+  else
+    UnusedSquare
 
 
 -- UPDATE
@@ -76,30 +108,9 @@ subscriptions model =
 -- VIEW
 
 
-type Square = UnusedSquare | EmptySquare
-type alias Row = List Square
-type alias Grid = List Row
-
-
-render : Model -> Grid
-render model =
-  List.map (renderRow model) (gridIndices model)
-
-renderRow : Model -> Int -> Row
-renderRow model rowIndex =
-  List.map (renderSquare model rowIndex) (gridIndices model)
-
-renderSquare : Model -> Int -> Int -> Square
-renderSquare model rowIndex columnIndex =
-  if isActive model rowIndex columnIndex then
-    EmptySquare
-  else
-    UnusedSquare
-
-
 view : Model -> Html Msg
 view model =
-  viewGrid (render model)
+  viewGrid model.grid
 
 
 viewGrid : Grid -> Html Msg
