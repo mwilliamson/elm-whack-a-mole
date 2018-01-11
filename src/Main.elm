@@ -34,10 +34,16 @@ type alias Row = List Square
 type alias Grid = List Row
   
 activeWidth : GridSize -> Int
-activeWidth gridSize = gridSize.activeRadius * 2 - 1
+activeWidth gridSize = radiusToWidth gridSize.activeRadius
+
+maxRadius : GridSize -> Int
+maxRadius gridSize = 5
 
 maxWidth : GridSize -> Int
-maxWidth gridSize = 5
+maxWidth gridSize = radiusToWidth (maxRadius gridSize)
+
+radiusToWidth : Int -> Int
+radiusToWidth radius = radius * 2 - 1
 
 gridIndices : GridSize -> List Int
 gridIndices gridSize = List.range 0 ((maxWidth gridSize) - 1)
