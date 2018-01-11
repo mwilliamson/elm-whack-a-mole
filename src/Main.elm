@@ -2,6 +2,7 @@ import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Random
+import Time
 
 
 
@@ -20,6 +21,7 @@ main =
 
 type alias Model =
   { activeRadius : Int
+  , tickIndex: Int
   }
   
 activeWidth : Model -> Int
@@ -45,18 +47,20 @@ isActiveIndex model index =
 
 init : (Model, Cmd Msg)
 init =
-  ({ activeRadius = 2 }, Cmd.none)
+  ({ activeRadius = 2, tickIndex = 0 }, Cmd.none)
 
 
 
 -- UPDATE
 
 
-type alias Msg = {}
+type Msg = Tick
 
 
 update : Msg -> Model -> (Model, Cmd Msg)
-update msg model = (model, Cmd.none)
+update msg model =
+  case msg of
+    Tick -> ({ model | tickIndex = model.tickIndex + 1 }, Cmd.none)
 
 
 
@@ -65,7 +69,7 @@ update msg model = (model, Cmd.none)
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-  Sub.none
+  Time.every Time.second (\_ -> Tick)
 
 
 
