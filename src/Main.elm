@@ -72,22 +72,49 @@ subscriptions model =
 -- VIEW
 
 
+type Square = UnusedSquare | EmptySquare
+type alias Row = List Square
+type alias Grid = List Row
+
+
+render : Model -> Grid
+render model =
+  List.map (renderRow model) (gridIndices model)
+
+renderRow : Model -> Int -> Row
+renderRow model rowIndex =
+  List.map (renderSquare model rowIndex) (gridIndices model)
+
+renderSquare : Model -> Int -> Int -> Square
+renderSquare model rowIndex columnIndex =
+  if isActive model rowIndex columnIndex then
+    EmptySquare
+  else
+    UnusedSquare
+
+
 view : Model -> Html Msg
 view model =
-  div [] (List.map (viewModelRow model) (gridIndices model))
+  viewGrid (render model)
 
 
-viewModelRow : Model -> Int -> Html Msg
-viewModelRow model rowIndex =
-  viewRow (List.map (viewModelSquare model rowIndex) (gridIndices model))
+viewGrid : Grid -> Html Msg
+viewGrid grid =
+  div [] (List.map viewGridRow grid)
 
 
-viewModelSquare : Model -> Int -> Int -> Html Msg
-viewModelSquare model rowIndex columnIndex =
-  if isActive model rowIndex columnIndex then
-    viewEmptySquare
-  else
-    viewUnusedSquare
+viewGridRow : Row -> Html Msg
+viewGridRow row =
+  viewRow (List.map viewGridSquare row)
+
+
+viewGridSquare : Square -> Html Msg
+viewGridSquare square =
+  case square of
+    EmptySquare ->
+      viewEmptySquare
+    UnusedSquare ->
+      viewUnusedSquare
 
 
 viewRow : List (Html Msg) -> Html Msg
