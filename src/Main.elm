@@ -33,8 +33,11 @@ type Square = UnusedSquare | EmptySquare
 type alias Row = List Square
 type alias Grid = List Row
   
+activeRadius : GridSize -> Int
+activeRadius gridSize = gridSize.activeRadius
+  
 activeWidth : GridSize -> Int
-activeWidth gridSize = radiusToWidth gridSize.activeRadius
+activeWidth gridSize = radiusToWidth (activeRadius gridSize)
 
 maxRadius : GridSize -> Int
 maxRadius gridSize = 5
@@ -55,7 +58,7 @@ isActive gridSize rowIndex columnIndex =
 isActiveIndex : GridSize -> Int -> Bool
 isActiveIndex gridSize index =
   let
-    left = ((maxWidth gridSize) - (activeWidth gridSize)) // 2
+    left = (maxRadius gridSize) - (activeRadius gridSize)
     right = left + (activeWidth gridSize) - 1
   in
     index >= left && index <= right
