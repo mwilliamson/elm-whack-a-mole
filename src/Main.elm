@@ -1,3 +1,4 @@
+import Array
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
@@ -167,14 +168,15 @@ update msg model =
           Just stage ->
             let
               grid = initialGrid stage
-              updateState badSquare =
+              emptySquares = findEmptySquareIndices grid
+              updateState availableSquares =
                 { tickIndex = tickIndex,
-                  grid = (maybeSetBadSquare grid badSquare),
+                  grid = (maybeSetBadSquare grid (List.head availableSquares)),
                   score = (currentScore model)
                 }
             in
               ( model
-              , Random.generate (updateState >> UpdateState) (selectRandomEmptySquare grid)
+              , Random.generate (updateState >> UpdateState) (shuffle emptySquares)
               )
           Nothing -> (model, Cmd.none)
         
@@ -224,14 +226,60 @@ mapSquares mapSquare grid = List.map
   (indexedGrid grid)
 
 
-selectRandomEmptySquare : Grid -> Random.Generator (Maybe (Int, Int))
-selectRandomEmptySquare grid =
-  selectRandom (findEmptySquareIndices grid)
+shuffle : List a -> Random.Generator (List a)
+shuffle list =
+  Random.map Array.toList (shuffleArray (Array.fromList list))
 
 
-selectRandom : List a -> Random.Generator (Maybe a)
-selectRandom list =
-  Random.map (nth list) (Random.int 0 ((List.length list) - 1))
+shuffleArray : Array.Array a -> Random.Generator (Array.Array a)
+shuffleArray array =
+  let
+    lastIndex = (Array.length array) - 1
+    range = List.range 0 (lastIndex - 1)
+    indicesGenerator =
+      flattenGenerators (List.map (\index -> Random.int index lastIndex) range)
+    indicesToSwapGenerator =
+      Random.map (List.map2 (,) range) indicesGenerator
+  in
+    Random.map (swapIndices array) indicesToSwapGenerator
+
+
+swapIndices : Array.Array a -> List (Int, Int) -> Array.Array a
+swapIndices array toSwaps =
+  case toSwaps of
+    ((firstIndex, secondIndex)::toSwapsTail) ->
+      swapIndices (swap array firstIndex secondIndex) (List.drop 1 toSwaps)  
+    
+    [] -> array
+
+
+swap : Array.Array a -> Int -> Int -> Array.Array a
+swap array firstIndex secondIndex =
+  let
+    first = Array.get firstIndex array
+    second = Array.get secondIndex array
+  in
+    case (first, second) of
+      (Just first, Just second) ->
+        Array.set firstIndex second (Array.set secondIndex first array)
+      _ -> array
+
+
+flattenGenerators : List (Random.Generator a) -> Random.Generator (List a)
+flattenGenerators =
+  foldGenerators (::) []
+
+
+foldGenerators : (a -> b -> b) -> b -> List (Random.Generator a) -> Random.Generator b
+foldGenerators f initial list =
+  case list of
+    head::tail -> Random.map2 f head (foldGenerators f initial tail)
+    [] -> liftRandom initial
+    
+
+liftRandom : a -> Random.Generator a
+liftRandom value =
+  Random.map (\_ -> value) (Random.list 0 Random.bool)
 
 
 nth : List a -> Int -> Maybe a
