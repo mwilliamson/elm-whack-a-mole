@@ -23,6 +23,7 @@ main =
 personScore : Person -> Int
 personScore person =
   case person of
+    SuperBadPerson -> 200
     BadPerson -> 50
     GoodPerson -> -100
 
@@ -46,13 +47,18 @@ type Model
   = Uninitialised
   | Playing PlayingState
 
+type alias ReadyState =
+  { superBadTickIndex : Int
+  }
+
 type alias PlayingState =
   { tickIndex : Int
   , grid : Grid
   , score : Int
+  , superBadTickIndex : Int
   }
 
-type Person = GoodPerson | BadPerson
+type Person = GoodPerson | BadPerson | SuperBadPerson
 
 type Square = UnusedSquare | EmptySquare | OccupiedSquare Person
 type alias Row = List Square
@@ -100,7 +106,12 @@ isActiveIndex stage index =
     index >= left && index <= right
 
 init : (Model, Cmd Msg)
-init = update Tick Uninitialised
+init =
+  let
+    totalTicks = ticksPerStage * (List.length stages)
+    lastTick = totalTicks - 1
+  in
+    (Uninitialised, Random.generate (Initialise) (Random.int 0 lastTick))
 
 
 initialGrid : Stage -> Grid
@@ -148,53 +159,36 @@ indexedGrid grid = List.indexedMap
 
 type Msg
   = Tick
+  | Initialise Int
   | UpdateState PlayingState
   | HitSquare (Int, Int) Square
-
-
-getState : (PlayingState -> a) -> a -> Model -> a
-getState get default model =
-  case model of
-    Playing state -> (get state)
-    _ -> default
-
-nextTickIndex : Model -> Int
-nextTickIndex model =
-  getState (.tickIndex >> ((+) 1)) 0 model
-
-currentScore : Model -> Int
-currentScore model =
-  getState .score 0 model
 
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
   case msg of
-    Tick ->
+    Initialise superBadTickIndex ->
       let
-        tickIndex = nextTickIndex model
+        initialPlayingState =
+          { tickIndex = 0
+          , grid = [] 
+          , superBadTickIndex = superBadTickIndex
+          , score = 0}
       in
-        case (activeStage tickIndex) of
-          Just stage ->
-            let
-              grid = initialGrid stage
-              emptySquares = findEmptySquareIndices grid
-              badSquares = (List.repeat stage.badSquares (OccupiedSquare BadPerson))
-              goodSquares = (List.repeat stage.goodSquares (OccupiedSquare GoodPerson))
-              filledSquares = badSquares ++ goodSquares
-              updateState availableSquares =
-                { tickIndex = tickIndex,
-                  grid = setSquares (List.map2 (,) availableSquares filledSquares) grid,
-                  score = (currentScore model)
-                }
-            in
-              ( model
-              , Random.generate (updateState >> UpdateState) (shuffle emptySquares)
-              )
-          Nothing -> (model, Cmd.none)
+        ( model, nextState 0 initialPlayingState )
+  
+    Tick ->
+      case model of
+        Uninitialised ->
+          (model, Cmd.none)
+        Playing state ->
+          let
+            tickIndex = state.tickIndex + 1
+          in
+            ( model, nextState tickIndex state )
         
     UpdateState state ->
-      ( Playing state, Cmd.none)
+      ( Playing state, Cmd.none )
       
     HitSquare coordinates square ->
       case square of
@@ -202,13 +196,36 @@ update msg model =
           let
             updatePlayingState state =
               let
-                score = (currentScore model) + (personScore person)
+                score = state.score + (personScore person)
                 grid = setSquare EmptySquare coordinates state.grid
               in
                 { state | score = score, grid = grid }
                 
           in ( mapPlayingState updatePlayingState model, Cmd.none )
         _ -> ( model, Cmd.none )
+
+
+nextState : Int -> PlayingState -> Cmd Msg
+nextState tickIndex state =
+  case activeStage tickIndex of
+    Just stage -> 
+      let
+        grid = initialGrid stage
+        emptySquares = findEmptySquareIndices grid
+        badSquares = (List.repeat stage.badSquares (OccupiedSquare BadPerson))
+        goodSquares = (List.repeat stage.goodSquares (OccupiedSquare GoodPerson))
+        isSuperBadTick = state.superBadTickIndex == tickIndex
+        superBadSquares = if isSuperBadTick then [OccupiedSquare SuperBadPerson] else []
+        filledSquares = badSquares ++ goodSquares ++ superBadSquares
+        updateState availableSquares =
+          { state
+          | tickIndex = tickIndex
+          , grid = setSquares (List.map2 (,) availableSquares filledSquares) grid
+          }
+      in Random.generate (updateState >> UpdateState) (shuffle emptySquares)
+    Nothing ->
+      Cmd.none
+  
 
 
 mapPlayingState : (PlayingState -> PlayingState) -> Model -> Model
@@ -308,7 +325,7 @@ nth list index = List.head (List.drop index list)
 subscriptions : Model -> Sub Msg
 subscriptions model =
   case model of
-    Playing state -> 
+    Playing state ->
       case activeStage state.tickIndex of
         Just stage -> Time.every stage.tickDuration (\_ -> Tick)
         Nothing -> Sub.none
@@ -354,6 +371,7 @@ squareColor square =
     EmptySquare -> "#eee"
     UnusedSquare -> "#fff"
     (OccupiedSquare BadPerson) -> "#900"
+    (OccupiedSquare SuperBadPerson) -> "#c39"
     (OccupiedSquare GoodPerson) -> "#090"
 
 
