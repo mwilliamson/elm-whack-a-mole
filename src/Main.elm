@@ -124,7 +124,7 @@ update msg model =
   case msg of
     Tick ->
       ( { model | tickIndex = model.tickIndex + 1 }
-      , Random.generate ((maybeSetBadSquare model.grid) >> UpdateGrid) (selectRandom (findEmptySquareIndices model.grid))
+      , Random.generate ((maybeSetBadSquare (initialGrid model.gridSize)) >> UpdateGrid) (selectRandom (findEmptySquareIndices model.grid))
       )
     UpdateGrid grid ->
       ( { model | grid = grid }, Cmd.none)
