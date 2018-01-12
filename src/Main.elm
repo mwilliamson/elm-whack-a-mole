@@ -153,17 +153,19 @@ setBadSquare : Grid -> (Int, Int) -> Grid
 setBadSquare = setSquare BadSquare
 
 setSquare : Square -> Grid -> (Int, Int) -> Grid
-setSquare newSquare grid targetCoordinates = List.map
-  (\row ->
-    List.map
-      (\(coordinates, square) ->
-        if coordinates == targetCoordinates then
-          newSquare
-        else
-          square
-      )
-      row
+setSquare newSquare grid targetCoordinates = mapSquares
+  (\(coordinates, square) ->
+    if coordinates == targetCoordinates then
+      newSquare
+    else
+      square
   )
+  grid
+
+
+mapSquares : (((Int, Int), Square) -> Square) -> Grid -> Grid
+mapSquares mapSquare grid = List.map
+  (List.map mapSquare)
   (indexedGrid grid)
 
 
