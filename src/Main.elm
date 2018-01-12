@@ -23,6 +23,7 @@ type alias Model =
   { gridSize : GridSize
   , tickIndex : Int
   , grid : Grid
+  , score : Int
   }
 
 type alias GridSize =
@@ -71,6 +72,7 @@ init =
     ( { gridSize = gridSize
       , tickIndex = 0
       , grid = initialGrid gridSize
+      , score = 0
       }
     , Cmd.none
     )
@@ -179,7 +181,11 @@ subscriptions model =
 
 view : Model -> Html Msg
 view model =
-  viewGrid model.grid
+  div
+    []
+    [ (text ("Score: " ++ (toString model.score)))
+    , viewGrid model.grid
+    ]
 
 
 viewGrid : Grid -> Html Msg
