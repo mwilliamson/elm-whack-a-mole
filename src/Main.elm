@@ -49,10 +49,6 @@ type Model
   = Uninitialised
   | Playing PlayingState
 
-type alias ReadyState =
-  { superBadTickIndex : Int
-  }
-
 type alias PlayingState =
   { tickIndex : Int
   , grid : Grid
