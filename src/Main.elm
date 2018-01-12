@@ -223,11 +223,12 @@ nextState tickIndex state =
       
         grid = initialGrid stage keepSuperBad state
         emptySquares = findEmptySquareIndices grid
+        
         badSquares = List.repeat stage.badSquares (OccupiedSquare BadPerson)
         goodSquares = List.repeat stage.goodSquares (OccupiedSquare GoodPerson)
-        
         superBadSquares = if isSuperBadStartTick then [OccupiedSquare SuperBadPerson] else []
         filledSquares = badSquares ++ goodSquares ++ superBadSquares
+        
         updateState availableSquares =
           { state
           | tickIndex = tickIndex
