@@ -1,4 +1,5 @@
 import Array
+import Dict
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
@@ -19,20 +20,26 @@ main =
 
 -- MODEL
 
-hitBadSquareScore = 50
+personScore : Person -> Int
+personScore person =
+  case person of
+    BadPerson -> 50
+    GoodPerson -> -100
+
 ticksPerStage = 10
 
 type alias Stage =
   { radius : Int
-  , badSquares: Int
+  , badSquares : Int
+  , goodSquares : Int
   , tickDuration : Time.Time
   }
 
 stages =
-  [ { radius = 2, badSquares = 2, tickDuration = Time.second }
-  , { radius = 3, badSquares = 3, tickDuration = Time.second * 0.9 }
-  , { radius = 4, badSquares = 4, tickDuration = Time.second * 0.8 }
-  , { radius = 5, badSquares = 5, tickDuration = Time.second * 0.7 }
+  [ { radius = 2, badSquares = 2, goodSquares = 1, tickDuration = Time.second }
+  , { radius = 3, badSquares = 3, goodSquares = 2, tickDuration = Time.second * 0.9 }
+  , { radius = 4, badSquares = 4, goodSquares = 3, tickDuration = Time.second * 0.8 }
+  , { radius = 5, badSquares = 5, goodSquares = 4, tickDuration = Time.second * 0.7 }
   ]
 
 type Model
@@ -45,7 +52,9 @@ type alias PlayingState =
   , score : Int
   }
 
-type Square = UnusedSquare | EmptySquare | BadSquare
+type Person = GoodPerson | BadPerson
+
+type Square = UnusedSquare | EmptySquare | OccupiedSquare Person
 type alias Row = List Square
 type alias Grid = List Row
 
@@ -140,7 +149,7 @@ indexedGrid grid = List.indexedMap
 type Msg
   = Tick
   | UpdateState PlayingState
-  | HitBadSquare (Int, Int)
+  | HitSquare (Int, Int) Square
 
 
 getState : (PlayingState -> a) -> a -> Model -> a
@@ -170,9 +179,12 @@ update msg model =
             let
               grid = initialGrid stage
               emptySquares = findEmptySquareIndices grid
+              badSquares = (List.repeat stage.badSquares (OccupiedSquare BadPerson))
+              goodSquares = (List.repeat stage.goodSquares (OccupiedSquare GoodPerson))
+              filledSquares = badSquares ++ goodSquares
               updateState availableSquares =
                 { tickIndex = tickIndex,
-                  grid = List.foldl setBadSquare grid (List.take stage.badSquares availableSquares),
+                  grid = setSquares (List.map2 (,) availableSquares filledSquares) grid,
                   score = (currentScore model)
                 }
             in
@@ -184,16 +196,20 @@ update msg model =
     UpdateState state ->
       ( Playing state, Cmd.none)
       
-    HitBadSquare coordinates ->
-      let
-        updatePlayingState state =
+    HitSquare coordinates square ->
+      case square of
+        OccupiedSquare person -> 
           let
-            score = (currentScore model) + hitBadSquareScore
-            grid = setSquare EmptySquare coordinates state.grid
-          in
-            { state | score = score, grid = grid }
-            
-      in ( mapPlayingState updatePlayingState model, Cmd.none )
+            updatePlayingState state =
+              let
+                score = (currentScore model) + (personScore person)
+                grid = setSquare EmptySquare coordinates state.grid
+              in
+                { state | score = score, grid = grid }
+                
+          in ( mapPlayingState updatePlayingState model, Cmd.none )
+        _ -> ( model, Cmd.none )
+
 
 mapPlayingState : (PlayingState -> PlayingState) -> Model -> Model
 mapPlayingState update model =
@@ -201,18 +217,23 @@ mapPlayingState update model =
     Playing state -> Playing (update state)
     _ -> model
 
-setBadSquare : (Int, Int) -> Grid -> Grid
-setBadSquare = setSquare BadSquare
+
+setSquares : List ((Int, Int), Square) -> Grid -> Grid
+setSquares newSquares grid =
+  let
+    squareLookup = Dict.fromList newSquares
+  in
+    mapSquares
+      (\(coordinates, square) ->
+        case Dict.get coordinates squareLookup of
+          Just newSquare -> newSquare
+          Nothing -> square
+      )
+      grid
 
 setSquare : Square -> (Int, Int) -> Grid -> Grid
-setSquare newSquare targetCoordinates grid = mapSquares
-  (\(coordinates, square) ->
-    if coordinates == targetCoordinates then
-      newSquare
-    else
-      square
-  )
-  grid
+setSquare newSquare targetCoordinates =
+  setSquares [(targetCoordinates, newSquare)]
 
 
 mapSquares : (((Int, Int), Square) -> a) -> Grid -> List (List a)
@@ -324,33 +345,24 @@ viewGrid grid =
 
 viewGridSquare : (Int, Int) -> Square -> Html Msg
 viewGridSquare coordinates square =
+  viewSquare (squareColor square) (HitSquare coordinates square)
+
+
+squareColor : Square -> String
+squareColor square =
   case square of
-    EmptySquare ->
-      viewEmptySquare
-    UnusedSquare ->
-      viewUnusedSquare
-    BadSquare ->
-      viewBadSquare (HitBadSquare coordinates)
+    EmptySquare -> "#eee"
+    UnusedSquare -> "#fff"
+    (OccupiedSquare BadPerson) -> "#900"
+    (OccupiedSquare GoodPerson) -> "#090"
 
 
 viewRow : List (Html Msg) -> Html Msg
 viewRow = div [style [("clear", "both")]]
 
 
-viewEmptySquare : Html Msg
-viewEmptySquare = viewSquare "#eee" Nothing
-
-
-viewUnusedSquare : Html Msg
-viewUnusedSquare = viewSquare "#fff" Nothing
-
-
-viewBadSquare : Msg -> Html Msg
-viewBadSquare onClick = viewSquare "#900" (Just onClick)
-
-
-viewSquare : String -> (Maybe Msg) -> Html Msg
-viewSquare color maybeOnClick =
+viewSquare : String -> Msg -> Html Msg
+viewSquare color handleClick =
   let
     width = "40px"
     squareStyle = style
@@ -360,10 +372,7 @@ viewSquare color maybeOnClick =
       , ("width", width)
       , ("height", width)
       ]
-    handlers = case maybeOnClick of
-      Just handler -> [ onClick handler ]
-      Nothing -> []
   in
     div
-      ([ squareStyle ] ++ handlers)
+      [ squareStyle, onClick handleClick ]
       []
