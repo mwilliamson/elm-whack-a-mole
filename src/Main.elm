@@ -23,13 +23,14 @@ ticksPerStage = 10
 
 type alias Stage =
   { radius : Int
+  , tickDuration : Time.Time
   }
 
 stages =
-  [ { radius = 2 }
-  , { radius = 3 }
-  , { radius = 4 }
-  , { radius = 5 }
+  [ { radius = 2, tickDuration = Time.second }
+  , { radius = 3, tickDuration = Time.second * 0.9 }
+  , { radius = 4, tickDuration = Time.second * 0.8 }
+  , { radius = 5, tickDuration = Time.second * 0.7 }
   ]
 
 type alias Model =
@@ -47,7 +48,7 @@ activeStage tickIndex =
   let 
     stageIndex = tickIndex // ticksPerStage
   in
-    Maybe.withDefault { radius = 0 } (nth stages stageIndex)
+    Maybe.withDefault { radius = 0, tickDuration = Time.second } (nth stages stageIndex)
 
 activeRadius : Stage -> Int
 activeRadius stage = stage.radius
@@ -204,7 +205,10 @@ nth list index = List.head (List.drop index list)
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-  Time.every Time.second (\_ -> Tick)
+  let
+    stage = activeStage model.tickIndex
+  in
+    Time.every stage.tickDuration (\_ -> Tick)
 
 
 
