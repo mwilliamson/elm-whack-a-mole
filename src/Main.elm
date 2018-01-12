@@ -105,7 +105,11 @@ findEmptySquareIndices grid = List.filterMap
   (indexedSquares grid)
 
 indexedSquares : Grid -> List ((Int, Int), Square)
-indexedSquares grid = List.concat <| List.indexedMap
+indexedSquares grid = indexedGrid grid |> List.concat
+
+
+indexedGrid : Grid -> List (List ((Int, Int), Square))
+indexedGrid grid = List.indexedMap
   (\rowIndex -> \row ->
     List.indexedMap
       (\columnIndex -> \square ->
@@ -114,7 +118,6 @@ indexedSquares grid = List.concat <| List.indexedMap
       row
   )
   grid
-
 
 -- UPDATE
 
