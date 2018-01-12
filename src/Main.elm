@@ -168,14 +168,13 @@ update msg model =
             let
               grid = initialGrid stage
               updateState badSquare =
-                UpdateState
-                  { tickIndex = tickIndex,
-                    grid = (maybeSetBadSquare grid badSquare),
-                    score = (currentScore model)
-                  }
+                { tickIndex = tickIndex,
+                  grid = (maybeSetBadSquare grid badSquare),
+                  score = (currentScore model)
+                }
             in
               ( model
-              , Random.generate updateState (selectRandom (findEmptySquareIndices grid))
+              , Random.generate (updateState >> UpdateState) (selectRandomEmptySquare grid)
               )
           Nothing -> (model, Cmd.none)
         
@@ -223,6 +222,11 @@ mapSquares : (((Int, Int), Square) -> a) -> Grid -> List (List a)
 mapSquares mapSquare grid = List.map
   (List.map mapSquare)
   (indexedGrid grid)
+
+
+selectRandomEmptySquare : Grid -> Random.Generator (Maybe (Int, Int))
+selectRandomEmptySquare grid =
+  selectRandom (findEmptySquareIndices grid)
 
 
 selectRandom : List a -> Random.Generator (Maybe a)
