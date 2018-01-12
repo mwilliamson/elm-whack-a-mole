@@ -153,21 +153,18 @@ setBadSquare : Grid -> (Int, Int) -> Grid
 setBadSquare = setSquare BadSquare
 
 setSquare : Square -> Grid -> (Int, Int) -> Grid
-setSquare newSquare grid (targetRowIndex, targetColumnIndex) = List.indexedMap
-  (\rowIndex -> \row ->
-    if rowIndex == targetRowIndex then
-      List.indexedMap
-        (\columnIndex -> \square ->
-          if columnIndex == targetColumnIndex then
-            newSquare
-          else
-            square
-        )
-        row
-    else
+setSquare newSquare grid targetCoordinates = List.map
+  (\row ->
+    List.map
+      (\(coordinates, square) ->
+        if coordinates == targetCoordinates then
+          newSquare
+        else
+          square
+      )
       row
   )
-  grid
+  (indexedGrid grid)
 
 
 selectRandom : List a -> Random.Generator (Maybe a)
@@ -204,16 +201,12 @@ viewGrid : Grid -> Html Msg
 viewGrid grid =
   div
     []
-    (List.indexedMap viewGridRow grid)
+    (List.map viewGridRow (indexedGrid grid))
 
 
-viewGridRow : Int -> Row -> Html Msg
-viewGridRow rowIndex row =
-  viewRow
-    (List.indexedMap
-      (\columnIndex -> \square -> viewGridSquare (rowIndex, columnIndex) square)
-      row
-    )
+viewGridRow : List ((Int, Int), Square) -> Html Msg
+viewGridRow row =
+  viewRow (List.map (uncurry viewGridSquare) row)
 
 
 viewGridSquare : (Int, Int) -> Square -> Html Msg
