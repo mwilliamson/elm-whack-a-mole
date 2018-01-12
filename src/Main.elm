@@ -33,7 +33,11 @@ stages =
   , { radius = 5, tickDuration = Time.second * 0.7 }
   ]
 
-type alias Model =
+type Model
+  = Uninitialised
+  | Playing PlayingState
+
+type alias PlayingState =
   { tickIndex : Int
   , grid : Grid
   , score : Int
@@ -43,12 +47,12 @@ type Square = UnusedSquare | EmptySquare | BadSquare
 type alias Row = List Square
 type alias Grid = List Row
 
-activeStage : Int -> Stage
+activeStage : Int -> Maybe Stage
 activeStage tickIndex =
   let 
     stageIndex = tickIndex // ticksPerStage
   in
-    Maybe.withDefault { radius = 0, tickDuration = Time.second } (nth stages stageIndex)
+    nth stages stageIndex
 
 activeRadius : Stage -> Int
 activeRadius stage = stage.radius
@@ -59,7 +63,7 @@ activeWidth stage = radiusToWidth (activeRadius stage)
 maxRadius : Int
 maxRadius = 
   let
-    radii = (List.map (\stage -> stage.radius) stages)
+    radii = (List.map .radius stages)
   in
     Maybe.withDefault 0 (List.maximum radii)
 
@@ -85,16 +89,7 @@ isActiveIndex stage index =
     index >= left && index <= right
 
 init : (Model, Cmd Msg)
-init =
-  let
-    tickIndex = 0
-  in
-    ( { tickIndex = 0
-      , grid = initialGrid (activeStage tickIndex)
-      , score = 0
-      }
-    , Cmd.none
-    )
+init = update Tick Uninitialised
 
 
 initialGrid : Stage -> Grid
@@ -142,8 +137,23 @@ indexedGrid grid = List.indexedMap
 
 type Msg
   = Tick
-  | UpdateGrid Grid
+  | UpdateState PlayingState
   | HitBadSquare (Int, Int)
+
+
+getState : (PlayingState -> a) -> a -> Model -> a
+getState get default model =
+  case model of
+    Playing state -> (get state)
+    _ -> default
+
+nextTickIndex : Model -> Int
+nextTickIndex model =
+  getState (.tickIndex >> ((+) 1)) 0 model
+
+currentScore : Model -> Int
+currentScore model =
+  getState .score 0 model
 
 
 update : Msg -> Model -> (Model, Cmd Msg)
@@ -151,19 +161,43 @@ update msg model =
   case msg of
     Tick ->
       let
-        tickIndex = model.tickIndex + 1
-        grid = initialGrid (activeStage tickIndex)
+        tickIndex = nextTickIndex model
       in
-        ( { model | tickIndex = tickIndex }
-        , Random.generate ((maybeSetBadSquare grid) >> UpdateGrid) (selectRandom (findEmptySquareIndices grid))
-        )
-    UpdateGrid grid ->
-      ( { model | grid = grid }, Cmd.none)
+        case (activeStage tickIndex) of
+          Just stage ->
+            let
+              grid = initialGrid stage
+              updateState badSquare =
+                UpdateState
+                  { tickIndex = tickIndex,
+                    grid = (maybeSetBadSquare grid badSquare),
+                    score = (currentScore model)
+                  }
+            in
+              ( model
+              , Random.generate updateState (selectRandom (findEmptySquareIndices grid))
+              )
+          Nothing -> (model, Cmd.none)
+        
+    UpdateState state ->
+      ( Playing state, Cmd.none)
+      
     HitBadSquare coordinates ->
       let
-        score = model.score + hitBadSquareScore
-      in
-        ( { model | score = score, grid = setSquare EmptySquare model.grid coordinates }, Cmd.none)
+        updatePlayingState state =
+          let
+            score = (currentScore model) + hitBadSquareScore
+            grid = setSquare EmptySquare state.grid coordinates
+          in
+            { state | score = score, grid = grid }
+            
+      in ( mapPlayingState updatePlayingState model, Cmd.none )
+
+mapPlayingState : (PlayingState -> PlayingState) -> Model -> Model
+mapPlayingState update model =
+  case model of
+    Playing state -> Playing (update state)
+    _ -> model
 
 maybeSetBadSquare : Grid -> Maybe (Int, Int) -> Grid
 maybeSetBadSquare grid coordinates =
@@ -205,10 +239,12 @@ nth list index = List.head (List.drop index list)
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-  let
-    stage = activeStage model.tickIndex
-  in
-    Time.every stage.tickDuration (\_ -> Tick)
+  case model of
+    Playing state -> 
+      case activeStage state.tickIndex of
+        Just stage -> Time.every stage.tickDuration (\_ -> Tick)
+        Nothing -> Sub.none
+    Uninitialised -> Sub.none
 
 
 
@@ -217,11 +253,14 @@ subscriptions model =
 
 view : Model -> Html Msg
 view model =
-  div
-    []
-    [ (text ("Score: " ++ (toString model.score)))
-    , viewGrid model.grid
-    ]
+  case model of
+    Uninitialised -> div [] []
+    Playing state ->
+      div
+        []
+        [ (text ("Score: " ++ (toString state.score)))
+        , viewGrid state.grid
+        ]
 
 
 viewGrid : Grid -> Html Msg
