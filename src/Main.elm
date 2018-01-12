@@ -18,6 +18,7 @@ main =
 
 -- MODEL
 
+hitBadSquareScore = 50
 
 type alias Model =
   { gridSize : GridSize
@@ -118,7 +119,10 @@ indexedSquares grid = List.concat <| List.indexedMap
 -- UPDATE
 
 
-type Msg = Tick | UpdateGrid Grid
+type Msg
+  = Tick
+  | UpdateGrid Grid
+  | HitBadSquare (Int, Int)
 
 
 update : Msg -> Model -> (Model, Cmd Msg)
@@ -130,6 +134,11 @@ update msg model =
       )
     UpdateGrid grid ->
       ( { model | grid = grid }, Cmd.none)
+    HitBadSquare coordinates ->
+      let
+        score = model.score + hitBadSquareScore
+      in
+        ( { model | score = score, grid = setSquare EmptySquare model.grid coordinates }, Cmd.none)
 
 maybeSetBadSquare : Grid -> Maybe (Int, Int) -> Grid
 maybeSetBadSquare grid coordinates =
@@ -190,23 +199,29 @@ view model =
 
 viewGrid : Grid -> Html Msg
 viewGrid grid =
-  div [] (List.map viewGridRow grid)
+  div
+    []
+    (List.indexedMap viewGridRow grid)
 
 
-viewGridRow : Row -> Html Msg
-viewGridRow row =
-  viewRow (List.map viewGridSquare row)
+viewGridRow : Int -> Row -> Html Msg
+viewGridRow rowIndex row =
+  viewRow
+    (List.indexedMap
+      (\columnIndex -> \square -> viewGridSquare (rowIndex, columnIndex) square)
+      row
+    )
 
 
-viewGridSquare : Square -> Html Msg
-viewGridSquare square =
+viewGridSquare : (Int, Int) -> Square -> Html Msg
+viewGridSquare coordinates square =
   case square of
     EmptySquare ->
       viewEmptySquare
     UnusedSquare ->
       viewUnusedSquare
     BadSquare ->
-      viewBadSquare
+      viewBadSquare (HitBadSquare coordinates)
 
 
 viewRow : List (Html Msg) -> Html Msg
@@ -214,29 +229,32 @@ viewRow = div [style [("clear", "both")]]
 
 
 viewEmptySquare : Html Msg
-viewEmptySquare = viewSquare "#eee"
+viewEmptySquare = viewSquare "#eee" Nothing
 
 
 viewUnusedSquare : Html Msg
-viewUnusedSquare = viewSquare "#fff"
+viewUnusedSquare = viewSquare "#fff" Nothing
 
 
-viewBadSquare : Html Msg
-viewBadSquare = viewSquare "#900"
+viewBadSquare : Msg -> Html Msg
+viewBadSquare onClick = viewSquare "#900" (Just onClick)
 
 
-viewSquare : String -> Html Msg
-viewSquare color =
+viewSquare : String -> (Maybe Msg) -> Html Msg
+viewSquare color maybeOnClick =
   let
     width = "40px"
+    squareStyle = style
+      [ ("float", "left")
+      , ("backgroundColor", color)
+      , ("border", "1px solid #fff")
+      , ("width", width)
+      , ("height", width)
+      ]
+    handlers = case maybeOnClick of
+      Just handler -> [ onClick handler ]
+      Nothing -> []
   in
     div
-      [ style
-        [ ("float", "left")
-        , ("backgroundColor", color)
-        , ("border", "1px solid #fff")
-        , ("width", width)
-        , ("height", width)
-        ]
-      ]
+      ([ squareStyle ] ++ handlers)
       []
