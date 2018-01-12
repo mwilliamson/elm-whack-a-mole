@@ -19,75 +19,92 @@ main =
 -- MODEL
 
 hitBadSquareScore = 50
+ticksPerStage = 10
+
+type alias Stage =
+  { radius : Int
+  }
+
+stages =
+  [ { radius = 2 }
+  , { radius = 3 }
+  , { radius = 4 }
+  , { radius = 5 }
+  ]
 
 type alias Model =
-  { gridSize : GridSize
-  , tickIndex : Int
+  { tickIndex : Int
   , grid : Grid
   , score : Int
   }
 
-type alias GridSize =
-  { activeRadius : Int
-  }
-  
 type Square = UnusedSquare | EmptySquare | BadSquare
 type alias Row = List Square
 type alias Grid = List Row
-  
-activeRadius : GridSize -> Int
-activeRadius gridSize = gridSize.activeRadius
-  
-activeWidth : GridSize -> Int
-activeWidth gridSize = radiusToWidth (activeRadius gridSize)
 
-maxRadius : GridSize -> Int
-maxRadius gridSize = 5
+activeStage : Int -> Stage
+activeStage tickIndex =
+  let 
+    stageIndex = tickIndex // ticksPerStage
+  in
+    Maybe.withDefault { radius = 0 } (nth stages stageIndex)
 
-maxWidth : GridSize -> Int
-maxWidth gridSize = radiusToWidth (maxRadius gridSize)
+activeRadius : Stage -> Int
+activeRadius stage = stage.radius
+  
+activeWidth : Stage -> Int
+activeWidth stage = radiusToWidth (activeRadius stage)
+
+maxRadius : Int
+maxRadius = 
+  let
+    radii = (List.map (\stage -> stage.radius) stages)
+  in
+    Maybe.withDefault 0 (List.maximum radii)
+
+maxWidth : Int
+maxWidth = radiusToWidth maxRadius
 
 radiusToWidth : Int -> Int
 radiusToWidth radius = radius * 2 - 1
 
-gridIndices : GridSize -> List Int
-gridIndices gridSize = List.range 0 ((maxWidth gridSize) - 1)
+gridIndices : List Int
+gridIndices = List.range 0 (maxWidth - 1)
 
-isActive : GridSize -> Int -> Int -> Bool
-isActive gridSize rowIndex columnIndex =
-  isActiveIndex gridSize rowIndex && isActiveIndex gridSize columnIndex
+isActive : Stage -> Int -> Int -> Bool
+isActive stage rowIndex columnIndex =
+  isActiveIndex stage rowIndex && isActiveIndex stage columnIndex
 
-isActiveIndex : GridSize -> Int -> Bool
-isActiveIndex gridSize index =
+isActiveIndex : Stage -> Int -> Bool
+isActiveIndex stage index =
   let
-    left = (maxRadius gridSize) - (activeRadius gridSize)
-    right = left + (activeWidth gridSize) - 1
+    left = maxRadius - (activeRadius stage)
+    right = left + (activeWidth stage) - 1
   in
     index >= left && index <= right
 
 init : (Model, Cmd Msg)
 init =
   let
-    gridSize = { activeRadius = 2 }
+    tickIndex = 0
   in
-    ( { gridSize = gridSize
-      , tickIndex = 0
-      , grid = initialGrid gridSize
+    ( { tickIndex = 0
+      , grid = initialGrid (activeStage tickIndex)
       , score = 0
       }
     , Cmd.none
     )
 
 
-initialGrid : GridSize -> Grid
-initialGrid gridSize =
-  List.map (initialRow gridSize) (gridIndices gridSize)
+initialGrid : Stage -> Grid
+initialGrid stage =
+  List.map (initialRow stage) gridIndices
 
-initialRow : GridSize -> Int -> Row
+initialRow : Stage -> Int -> Row
 initialRow gridSize rowIndex =
-  List.map (initialSquare gridSize rowIndex) (gridIndices gridSize)
+  List.map (initialSquare gridSize rowIndex) gridIndices
 
-initialSquare : GridSize -> Int -> Int -> Square
+initialSquare : Stage -> Int -> Int -> Square
 initialSquare gridSize rowIndex columnIndex =
   if isActive gridSize rowIndex columnIndex then
     EmptySquare
@@ -132,9 +149,13 @@ update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
   case msg of
     Tick ->
-      ( { model | tickIndex = model.tickIndex + 1 }
-      , Random.generate ((maybeSetBadSquare (initialGrid model.gridSize)) >> UpdateGrid) (selectRandom (findEmptySquareIndices model.grid))
-      )
+      let
+        tickIndex = model.tickIndex + 1
+        grid = initialGrid (activeStage tickIndex)
+      in
+        ( { model | tickIndex = tickIndex }
+        , Random.generate ((maybeSetBadSquare grid) >> UpdateGrid) (selectRandom (findEmptySquareIndices grid))
+        )
     UpdateGrid grid ->
       ( { model | grid = grid }, Cmd.none)
     HitBadSquare coordinates ->
