@@ -201,14 +201,14 @@ view model =
 
 viewGrid : Grid -> Html Msg
 viewGrid grid =
-  div
-    []
-    (List.map viewGridRow (indexedGrid grid))
-
-
-viewGridRow : List ((Int, Int), Square) -> Html Msg
-viewGridRow row =
-  viewRow (List.map (uncurry viewGridSquare) row)
+  let
+    squares = mapSquares
+      (uncurry viewGridSquare)
+      grid
+  in
+    div
+      []
+      (List.map viewRow squares)
 
 
 viewGridSquare : (Int, Int) -> Square -> Html Msg
