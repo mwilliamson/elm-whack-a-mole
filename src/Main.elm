@@ -24,14 +24,15 @@ ticksPerStage = 10
 
 type alias Stage =
   { radius : Int
+  , badSquares: Int
   , tickDuration : Time.Time
   }
 
 stages =
-  [ { radius = 2, tickDuration = Time.second }
-  , { radius = 3, tickDuration = Time.second * 0.9 }
-  , { radius = 4, tickDuration = Time.second * 0.8 }
-  , { radius = 5, tickDuration = Time.second * 0.7 }
+  [ { radius = 2, badSquares = 2, tickDuration = Time.second }
+  , { radius = 3, badSquares = 3, tickDuration = Time.second * 0.9 }
+  , { radius = 4, badSquares = 4, tickDuration = Time.second * 0.8 }
+  , { radius = 5, badSquares = 5, tickDuration = Time.second * 0.7 }
   ]
 
 type Model
@@ -171,7 +172,7 @@ update msg model =
               emptySquares = findEmptySquareIndices grid
               updateState availableSquares =
                 { tickIndex = tickIndex,
-                  grid = (maybeSetBadSquare grid (List.head availableSquares)),
+                  grid = List.foldl setBadSquare grid (List.take stage.badSquares availableSquares),
                   score = (currentScore model)
                 }
             in
@@ -188,7 +189,7 @@ update msg model =
         updatePlayingState state =
           let
             score = (currentScore model) + hitBadSquareScore
-            grid = setSquare EmptySquare state.grid coordinates
+            grid = setSquare EmptySquare coordinates state.grid
           in
             { state | score = score, grid = grid }
             
@@ -200,17 +201,11 @@ mapPlayingState update model =
     Playing state -> Playing (update state)
     _ -> model
 
-maybeSetBadSquare : Grid -> Maybe (Int, Int) -> Grid
-maybeSetBadSquare grid coordinates =
-  case coordinates of
-    Just c -> setBadSquare grid c
-    Nothing -> grid
-
-setBadSquare : Grid -> (Int, Int) -> Grid
+setBadSquare : (Int, Int) -> Grid -> Grid
 setBadSquare = setSquare BadSquare
 
-setSquare : Square -> Grid -> (Int, Int) -> Grid
-setSquare newSquare grid targetCoordinates = mapSquares
+setSquare : Square -> (Int, Int) -> Grid -> Grid
+setSquare newSquare targetCoordinates grid = mapSquares
   (\(coordinates, square) ->
     if coordinates == targetCoordinates then
       newSquare
