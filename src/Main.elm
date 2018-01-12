@@ -29,6 +29,8 @@ personScore person =
 
 ticksPerStage = 10
 
+superBadDuration = 5
+
 type alias Stage =
   { radius : Int
   , badSquares : Int
@@ -109,14 +111,24 @@ init : (Model, Cmd Msg)
 init =
   let
     totalTicks = ticksPerStage * (List.length stages)
-    lastTick = totalTicks - 1
+    lastPossibleTick = totalTicks - superBadDuration
   in
-    (Uninitialised, Random.generate (Initialise) (Random.int 0 lastTick))
+    (Uninitialised, Random.generate (Initialise) (Random.int 0 lastPossibleTick))
 
 
-initialGrid : Stage -> Grid
-initialGrid stage =
-  List.map (initialRow stage) gridIndices
+initialGrid : Stage -> Bool -> PlayingState -> Grid
+initialGrid stage keepSuperBad previousState =
+  let
+    emptyGrid = List.map (initialRow stage) gridIndices
+    remainingGrid =
+      if keepSuperBad then
+        List.filter
+          (Tuple.second >> ((==) (OccupiedSquare SuperBadPerson)))
+          (indexedSquares previousState.grid)
+      else
+        []
+  in
+    setSquares remainingGrid emptyGrid
 
 initialRow : Stage -> Int -> Row
 initialRow gridSize rowIndex =
@@ -210,12 +222,15 @@ nextState tickIndex state =
   case activeStage tickIndex of
     Just stage -> 
       let
-        grid = initialGrid stage
+        isSuperBadStartTick = state.superBadTickIndex == tickIndex
+        keepSuperBad = tickIndex > state.superBadTickIndex && tickIndex < state.superBadTickIndex + superBadDuration
+      
+        grid = initialGrid stage keepSuperBad state
         emptySquares = findEmptySquareIndices grid
         badSquares = (List.repeat stage.badSquares (OccupiedSquare BadPerson))
         goodSquares = (List.repeat stage.goodSquares (OccupiedSquare GoodPerson))
-        isSuperBadTick = state.superBadTickIndex == tickIndex
-        superBadSquares = if isSuperBadTick then [OccupiedSquare SuperBadPerson] else []
+        
+        superBadSquares = if isSuperBadStartTick then [OccupiedSquare SuperBadPerson] else []
         filledSquares = badSquares ++ goodSquares ++ superBadSquares
         updateState availableSquares =
           { state
