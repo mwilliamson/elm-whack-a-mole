@@ -163,7 +163,7 @@ setSquare newSquare grid targetCoordinates = mapSquares
   grid
 
 
-mapSquares : (((Int, Int), Square) -> Square) -> Grid -> Grid
+mapSquares : (((Int, Int), Square) -> a) -> Grid -> List (List a)
 mapSquares mapSquare grid = List.map
   (List.map mapSquare)
   (indexedGrid grid)
