@@ -29,7 +29,7 @@ type alias GridSize =
   { activeRadius : Int
   }
   
-type Square = UnusedSquare | EmptySquare
+type Square = UnusedSquare | EmptySquare | BadSquare
 type alias Row = List Square
 type alias Grid = List Row
   
@@ -92,17 +92,77 @@ initialSquare gridSize rowIndex columnIndex =
     UnusedSquare
 
 
+findEmptySquareIndices : Grid -> List (Int, Int)
+findEmptySquareIndices grid = List.filterMap
+  (\(coordinates, square) ->
+    case square of
+      EmptySquare -> Just coordinates
+      _ -> Nothing
+  )
+  (indexedSquares grid)
+
+indexedSquares : Grid -> List ((Int, Int), Square)
+indexedSquares grid = List.concat <| List.indexedMap
+  (\rowIndex -> \row ->
+    List.indexedMap
+      (\columnIndex -> \square ->
+        ((rowIndex, columnIndex), square)
+      )
+      row
+  )
+  grid
+
+
 -- UPDATE
 
 
-type Msg = Tick
+type Msg = Tick | UpdateGrid Grid
 
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
   case msg of
-    Tick -> ({ model | tickIndex = model.tickIndex + 1 }, Cmd.none)
+    Tick ->
+      ( { model | tickIndex = model.tickIndex + 1 }
+      , Random.generate ((maybeSetBadSquare model.grid) >> UpdateGrid) (selectRandom (findEmptySquareIndices model.grid))
+      )
+    UpdateGrid grid ->
+      ( { model | grid = grid }, Cmd.none)
 
+maybeSetBadSquare : Grid -> Maybe (Int, Int) -> Grid
+maybeSetBadSquare grid coordinates =
+  case coordinates of
+    Just c -> setBadSquare grid c
+    Nothing -> grid
+
+setBadSquare : Grid -> (Int, Int) -> Grid
+setBadSquare = setSquare BadSquare
+
+setSquare : Square -> Grid -> (Int, Int) -> Grid
+setSquare newSquare grid (targetRowIndex, targetColumnIndex) = List.indexedMap
+  (\rowIndex -> \row ->
+    if rowIndex == targetRowIndex then
+      List.indexedMap
+        (\columnIndex -> \square ->
+          if columnIndex == targetColumnIndex then
+            newSquare
+          else
+            square
+        )
+        row
+    else
+      row
+  )
+  grid
+
+
+selectRandom : List a -> Random.Generator (Maybe a)
+selectRandom list =
+  Random.map (nth list) (Random.int 0 ((List.length list) - 1))
+
+
+nth : List a -> Int -> Maybe a
+nth list index = List.head (List.drop index list)
 
 
 -- SUBSCRIPTIONS
@@ -139,6 +199,8 @@ viewGridSquare square =
       viewEmptySquare
     UnusedSquare ->
       viewUnusedSquare
+    BadSquare ->
+      viewBadSquare
 
 
 viewRow : List (Html Msg) -> Html Msg
@@ -151,6 +213,10 @@ viewEmptySquare = viewSquare "#eee"
 
 viewUnusedSquare : Html Msg
 viewUnusedSquare = viewSquare "#fff"
+
+
+viewBadSquare : Html Msg
+viewBadSquare = viewSquare "#900"
 
 
 viewSquare : String -> Html Msg
